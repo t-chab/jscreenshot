@@ -1,4 +1,4 @@
-package name.chabs;
+package name.chabs.jscreenshot;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -26,7 +26,7 @@ public class AppTest
     }
 
     /**
-     * Rigourous Test :-)
+     * Rigorous Test :-)
      */
     public void testApp() {
         assertTrue(true);

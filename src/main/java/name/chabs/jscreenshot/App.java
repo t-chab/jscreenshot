@@ -11,7 +11,7 @@ import java.util.Date;
  * Sample app which take a screenshot and save it
  * to png file in temporary system directory
  */
-public class App {
+class App {
 
     public static void main(String[] args) {
         DesktopScreenRecorder recorder = new DesktopScreenRecorder();

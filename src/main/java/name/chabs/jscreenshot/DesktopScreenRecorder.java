@@ -5,9 +5,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.net.URL;
 
-public class DesktopScreenRecorder {
+class DesktopScreenRecorder {
 
-    public static boolean useWhiteCursor;
+    private boolean useWhiteCursor = false;
     private Robot robot;
     private BufferedImage mouseCursor;
 

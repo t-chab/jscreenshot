@@ -8,42 +8,80 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 
 public class ScreenshotImpl implements ScreenshotService {
 
+    private final static float SCREEN_PREVIEW_FACTOR = new Float(0.8);
     private final Logger logger = LoggerFactory.getLogger(ScreenshotImpl.class);
+    Rectangle captureRect;
 
-    private BufferedImage captureScreen() throws AWTException {
-        final String mouseCursorFile = "cursors/screenshot_cursor.png";
-        final URL cursorURL = getClass().getClassLoader().getResource(mouseCursorFile);
-        final Robot robot = new Robot();
+    private Rectangle makeScreenshot(final BufferedImage screen) {
+        final BufferedImage screenCopy = new BufferedImage(
+                screen.getWidth(),
+                screen.getHeight(),
+                screen.getType());
+        final JLabel screenLabel = new JLabel(new ImageIcon(screenCopy));
+        JScrollPane screenScroll = new JScrollPane(screenLabel);
 
-        // Init cursor
-        BufferedImage mouseCursor = null;
-        if (cursorURL != null) {
-            try {
-                mouseCursor = ImageIO.read(cursorURL);
-            } catch (IllegalArgumentException | IOException e) {
-                logger.warn("Exception {} when trying to read {}. Mouse cursor will not be initialized.",
-                        e.getMessage(), cursorURL);
+        int width = Math.round((new Float(screen.getWidth()) * SCREEN_PREVIEW_FACTOR));
+        int height = Math.round((new Float(screen.getHeight()) * SCREEN_PREVIEW_FACTOR));
+
+        screenScroll.setPreferredSize(new Dimension(width, height));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(screenScroll, BorderLayout.CENTER);
+
+        final JLabel selectionLabel = new JLabel("Select zone to capture");
+        panel.add(selectionLabel, BorderLayout.SOUTH);
+
+        repaint(screen, screenCopy);
+        screenLabel.repaint();
+
+        screenLabel.addMouseMotionListener(new MouseMotionAdapter() {
+
+            Point start = new Point();
+
+            @Override
+            public void mouseMoved(MouseEvent me) {
+                start = me.getPoint();
+                repaint(screen, screenCopy);
+                logger.debug("Start Point: {}", start);
+                screenLabel.repaint();
             }
+
+            @Override
+            public void mouseDragged(MouseEvent me) {
+                Point end = me.getPoint();
+                captureRect = new Rectangle(start,
+                        new Dimension(end.x - start.x, end.y - start.y));
+                repaint(screen, screenCopy);
+                screenLabel.repaint();
+                logger.debug("Rectangle: {}", captureRect);
+            }
+        });
+
+        JOptionPane.showMessageDialog(null, panel);
+
+        logger.debug("Rectangle of interest: {}", captureRect);
+
+        return captureRect;
+    }
+
+    void repaint(BufferedImage orig, BufferedImage copy) {
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(orig, 0, 0, null);
+        if (captureRect != null) {
+            g.setColor(Color.RED);
+            g.draw(captureRect);
+            g.setColor(new Color(255, 255, 255, 150));
+            g.fill(captureRect);
         }
-
-        final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        final Point mousePosition = MouseInfo.getPointerInfo().getLocation();
-        final BufferedImage image = robot.createScreenCapture(new Rectangle(screenSize));
-
-        Graphics2D graphics = image.createGraphics();
-        graphics.drawImage(mouseCursor, mousePosition.x - 8, mousePosition.y - 5, null);
-        graphics.dispose();
-
-        SwingUtilities.invokeLater(() -> new CaptureRectangle(image));
-
-        return image;
+        g.dispose();
     }
 
     public void saveScreenshot(final String fileName) throws ScreenshotException {
@@ -54,8 +92,19 @@ public class ScreenshotImpl implements ScreenshotService {
 
         File outputFile = new File(fileName);
 
+        final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
         try {
-            final BufferedImage lImg = captureScreen();
+            final Robot robot = new Robot();
+            // Create full screenshot
+            final BufferedImage image = robot.createScreenCapture(new Rectangle(screenSize));
+
+            // Ask user to choose which part of screen to use
+            Rectangle rect = makeScreenshot(image);
+
+            // Save selected part
+            final BufferedImage lImg = robot.createScreenCapture(rect);
+
             ImageIO.write(lImg, "png", outputFile);
         } catch (AWTException | IOException lEx) {
             throw new ScreenshotException(lEx.getMessage(), lEx);
